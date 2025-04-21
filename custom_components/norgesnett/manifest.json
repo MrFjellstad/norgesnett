@@ -1,0 +1,10 @@
+{
+  "domain": "norgesnett",
+  "name": "Norgesnett",
+  "documentation": "https://github.com/MrFjellstad/norgesnett",
+  "issue_tracker": "https://github.com/MrFjellstad/norgesnett/issues",
+  "dependencies": [],
+  "config_flow": true,
+  "codeowners": ["@MrFjellstad"],
+  "requirements": []
+}
