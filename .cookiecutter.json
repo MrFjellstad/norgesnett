@@ -1,0 +1,13 @@
+{
+  "_checkout": "2021.1.1",
+  "_output_dir": "/Users/kent",
+  "_repo_dir": "/Users/kent/.cookiecutters/cookiecutter-homeassistant-custom-component",
+  "_template": "gh:oncleben31/cookiecutter-homeassistant-custom-component",
+  "class_name_prefix": "Norgesnett",
+  "domain_name": "norgesnett",
+  "friendly_name": "Norgesnett",
+  "github_user": "MrFjellstad",
+  "project_name": "norgesnett",
+  "test_suite": "yes",
+  "version": "0.0.0"
+}
