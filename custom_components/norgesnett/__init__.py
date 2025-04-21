@@ -17,8 +17,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .api import NorgesnettApiClient
-from .const import CONF_METERINGPOINT_ID
 from .const import CONF_CUSTOMER_ID
+from .const import CONF_METERINGPOINT_ID
 from .const import DOMAIN
 from .const import PLATFORMS
 from .const import STARTUP_MESSAGE

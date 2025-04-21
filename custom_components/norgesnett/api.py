@@ -1,8 +1,8 @@
 """Sample API Client."""
 import asyncio
-from datetime import datetime
 import logging
 import socket
+from datetime import datetime
 
 import aiohttp
 import async_timeout
@@ -30,15 +30,19 @@ class NorgesnettApiClient:
     async def async_get_data(self) -> dict:
         """Get data from the API."""
         url = API_AUTH_URL
-        auth_info = await self.api_wrapper("post", url, json={
-            "customerId": self._customer_id,
-            "meteringPointId": self._meeteringpoint_id,
-        })
-        apiKey = auth_info['apiKey']
+        auth_info = await self.api_wrapper(
+            "post",
+            url,
+            json={
+                "customerId": self._customer_id,
+                "meteringPointId": self._meeteringpoint_id,
+            },
+        )
+        apiKey = auth_info["apiKey"]
         HEADERS = {
-            'X-API-Key': apiKey,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            "X-API-Key": apiKey,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
         }
         now = datetime.now()
         iso_string = now.replace(microsecond=0).isoformat()
@@ -47,9 +51,7 @@ class NorgesnettApiClient:
             "range": "today",
             "startTime": iso_string,
             "endTime": iso_string,
-            "meteringPointIds": [
-                "707057500075530687"
-            ]
+            "meteringPointIds": ["707057500075530687"],
         }
         url = API_TARIFFS_URL
         tariffs = await self.api_wrapper("post", url, headers=HEADERS, json=request)

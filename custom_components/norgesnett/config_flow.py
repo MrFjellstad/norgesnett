@@ -5,8 +5,8 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .api import NorgesnettApiClient
-from .const import CONF_METERINGPOINT_ID
 from .const import CONF_CUSTOMER_ID
+from .const import CONF_METERINGPOINT_ID
 from .const import DOMAIN
 from .const import PLATFORMS
 
@@ -54,7 +54,10 @@ class NorgesnettFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
-                {vol.Required(CONF_CUSTOMER_ID): str, vol.Required(CONF_METERINGPOINT_ID): str}
+                {
+                    vol.Required(CONF_CUSTOMER_ID): str,
+                    vol.Required(CONF_METERINGPOINT_ID): str,
+                }
             ),
             errors=self._errors,
         )
