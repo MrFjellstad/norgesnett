@@ -30,7 +30,7 @@ SCAN_INTERVAL = timedelta(days=1)
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
-CONFIG_SCHEMA = cv.config_entry_only_config_schema
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: Config):
@@ -88,6 +88,7 @@ class NorgesnettDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             return await self.api.async_get_data()
         except Exception as exception:
+            self.logger.error(exception)
             raise UpdateFailed() from exception
 
 

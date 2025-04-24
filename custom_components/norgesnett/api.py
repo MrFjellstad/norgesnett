@@ -12,7 +12,6 @@ from .const import API_AUTH_URL, API_TARIFFS_URL
 
 TIMEOUT = 10
 
-
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
 HEADERS = {"Content-type": "application/json; charset=UTF-8"}
@@ -33,15 +32,14 @@ class NorgesnettApiClient:
         auth_info = await self.api_wrapper(
             "post",
             url,
-            data={
+            {
                 "customerId": self._customer_id,
                 "meteringPointId": self._meteringpoint_id,
             },
-            headers=HEADERS,
         )
         apiKey = auth_info["apiKey"]
-
-        return apiKey
+        _LOGGER.debug("apiKey:", apiKey)
+        return auth_info
 
     async def async_get_data(self) -> dict:
         """Get data from the API."""
@@ -53,6 +51,7 @@ class NorgesnettApiClient:
                 "customerId": self._customer_id,
                 "meteringPointId": self._meteringpoint_id,
             },
+            headers=HEADERS,
         )
         apiKey = auth_info["apiKey"]
         headers = {
@@ -70,32 +69,44 @@ class NorgesnettApiClient:
             "meteringPointIds": [self._meteringpoint_id],
         }
         url = API_TARIFFS_URL
-        tariffs = await self.api_wrapper("post", url, request, headers)
+        tariffs = await self.api_wrapper("post", url, data=request, headers=headers)
         return tariffs
 
-    async def async_set_title(self, value: str) -> None:
-        """Get data from the API."""
-        url = "https://jsonplaceholder.typicode.com/posts/1"
-        await self.api_wrapper("patch", url, data={"title": value}, headers=HEADERS)
+    # async def async_set_title(self, value: str) -> None:
+    #     """Get data from the API."""
+    #     url = "https://jsonplaceholder.typicode.com/posts/1"
+    #     await self.api_wrapper("patch", url, data={"title": value}, headers=HEADERS)
 
     async def api_wrapper(
         self, method: str, url: str, data: dict = {}, headers: dict = {}
     ) -> dict:
         """Get information from the API."""
+        _LOGGER.info("api_wrapper: %s %s", method, url)
+        data = {} if data is None else data
+        headers = {} if headers is None else headers
         try:
-            async with async_timeout.timeout(TIMEOUT, loop=asyncio.get_event_loop()):
+            async with async_timeout.timeout(TIMEOUT):
                 if method == "get":
                     response = await self._session.get(url, headers=headers)
+                    response.raise_for_status()
                     return await response.json()
 
                 elif method == "put":
-                    await self._session.put(url, headers=headers, json=data)
+                    response = await self._session.put(url, headers=headers, json=data)
+                    response.raise_for_status()
+                    return await response.json()
 
                 elif method == "patch":
-                    await self._session.patch(url, headers=headers, json=data)
+                    response = await self._session.patch(
+                        url, headers=headers, json=data
+                    )
+                    response.raise_for_status()
+                    return await response.json()
 
                 elif method == "post":
-                    await self._session.post(url, headers=headers, json=data)
+                    response = await self._session.post(url, headers=headers, json=data)
+                    response.raise_for_status()
+                    return await response.json()
 
         except asyncio.TimeoutError as exception:
             _LOGGER.error(

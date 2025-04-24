@@ -4,9 +4,9 @@
 NAME = "Norgesnett"
 DOMAIN = "norgesnett"
 DOMAIN_DATA = f"{DOMAIN}_data"
-VERSION = "0.0.0"
+VERSION = "0.0.1"
 
-ATTRIBUTION = "Data provided by http://jsonplaceholder.typicode.com/"
+ATTRIBUTION = "Data provided by https://gridtariff-api.norgesnett.no/"
 ISSUE_URL = "https://github.com/MrFjellstad/norgesnett/issues"
 
 # Icons
