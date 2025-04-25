@@ -28,12 +28,19 @@ async def async_setup_entry(hass, entry, async_add_entities):
     mp_list = data["gridTariffCollections"][0]["meteringPointsAndPriceLevels"]
     mp = mp_list[0]
 
-    items = {"currentFixedPriceLevel": mp["currentFixedPriceLevel"]["id"]}
-    # {"monthlyTotal": data["monthlyTotal"]},
-    # {"monthlyTotalExVat": data["monthlyTotalExVat"]},
-    # {"monthlyExTaxes": data["monthlyExTaxes"]},
-    # {"monthlyTaxes": data["monthlyTaxes"]},
-    # {"monthlyUnitOfMeasure": data["monthlyUnitOfMeasure"]},
+    fixedPrices_list = data["gridTariffCollections"][0]["gridTariff"]["tariffPrice"][
+        "priceInfo"
+    ]["fixedPrices"]
+    fixedPrices = fixedPrices_list[0]
+
+    items = {
+        "currentFixedPriceLevel": mp["currentFixedPriceLevel"]["id"],
+        "monthlyTotal": fixedPrices["priceLevels"][0]["monthlyTotal"],
+        "monthlyTotalExVat": fixedPrices["priceLevels"][0]["monthlyTotalExVat"],
+        "monthlyExTaxes": fixedPrices["priceLevels"][0]["monthlyExTaxes"],
+        "monthlyTaxes": fixedPrices["priceLevels"][0]["monthlyTaxes"],
+        "monthlyUnitOfMeasure": fixedPrices["priceLevels"][0]["monthlyUnitOfMeasure"],
+    }
 
     entities = [
         NorgesnettSensor(coordinator, entry, key, value) for key, value in items.items()
