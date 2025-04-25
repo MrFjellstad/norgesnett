@@ -1,23 +1,14 @@
 """Sensor platform for Norgesnett."""
 
 import logging
+from datetime import datetime, timezone
+
+from homeassistant.components.sensor import SensorEntity
 
 from .const import DEFAULT_NAME, DOMAIN, ICON
 from .entity import NorgesnettEntity
 
 _LOGGER = logging.getLogger(__name__)
-
-# PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-#     {
-#         # This is only needed if you want the some area but want the prices in a non local currency
-#         vol.Optional("currentFixedPriceLevel", default=""): cv.string,
-#         vol.Optional("monthlyTotal", default=0): cv.positive_float,
-#         vol.Optional("monthlyTotalExVat", default=0): cv.positive_float,
-#         vol.Optional("monthlyExTaxes", default=0): cv.positive_float,
-#         vol.Optional("monthlyTaxes", default=0): cv.positive_float,
-#         vol.Optional("monthlyUnitOfMeasure", default="Kr/month"): cv.string,
-#     }
-# )
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -42,9 +33,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
         "monthlyUnitOfMeasure": fixedPrices["priceLevels"][0]["monthlyUnitOfMeasure"],
     }
 
-    entities = [
-        NorgesnettSensor(coordinator, entry, key, value) for key, value in items.items()
-    ]
+    entities = (
+        [NorgesnettHourlyPricesSensor(coordinator, entry)]
+        + [
+            NorgesnettSensor(coordinator, entry, key, value)
+            for key, value in items.items()
+        ]
+        + [NorgesnettCurrentPriceSensor(coordinator, entry)]
+    )
 
     async_add_entities(entities, update_before_add=True)
 
@@ -56,8 +52,6 @@ class NorgesnettSensor(NorgesnettEntity):
 
     def __init__(self, coordinator, config_entry, key: str, initial_value):
         super().__init__(coordinator, config_entry)
-        # self.coordinator = coordinator
-        # self._entry_id = entry_id
         self._key = key
         self._attr_unique_id = f"{config_entry.entry_id}_{key}"
         self._attr_native_value = initial_value
@@ -72,11 +66,6 @@ class NorgesnettSensor(NorgesnettEntity):
         """Return the name of the sensor."""
         return f"{DEFAULT_NAME}_{self._key}"
 
-    # @property
-    # def state(self):
-    #     """Return the state of the sensor."""
-    #     return self.coordinator.data.get("body")
-
     @property
     def icon(self):
         """Return the icon of the sensor."""
@@ -86,3 +75,79 @@ class NorgesnettSensor(NorgesnettEntity):
     def device_class(self):
         """Return de device class of the sensor."""
         return "norgesnett__custom_device_class"
+
+
+class NorgesnettHourlyPricesSensor(NorgesnettEntity, SensorEntity):
+    """Én sensor som inneholder alle tidsperioder som attributter."""
+
+    def __init__(self, coordinator, config_entry):
+        super().__init__(coordinator, config_entry)
+        self._attr_name = f"{DEFAULT_NAME} Hourly Prices"
+        self._attr_unique_id = f"{config_entry.entry_id}_hourly_prices"
+
+    @property
+    def state(self):
+        # Du kan for eksempel returnere antall perioder:
+        collections = self.coordinator.data.get("gridTariffCollections") or []
+
+        if not collections:
+            return None
+
+        hours = (
+            collections[0].get("gridTariff", {}).get("tariffPrice", {}).get("hours", [])
+        )
+        return len(hours)
+
+    @property
+    def extra_state_attributes(self):
+        """Returner dict med shortName som nøkkel, og total/totalExVat som verdi."""
+        result = {}
+        for hour in self.coordinator.data.get("hours", []):
+            sn = hour.get("shortName")
+            ep = hour.get("energyPrice", {})
+            if sn and ep:
+                result[sn] = {
+                    "total": ep.get("total"),
+                    "totalExVat": ep.get("totalExVat"),
+                }
+        return result
+
+
+class NorgesnettCurrentPriceSensor(NorgesnettEntity, SensorEntity):
+    """Sensor som viser dagens pris for gjeldende time."""
+
+    def __init__(self, coordinator, config_entry):
+        super().__init__(coordinator, config_entry)
+        self._attr_name = f"{DEFAULT_NAME} Current Hour Price"
+        self._attr_unique_id = f"{config_entry.entry_id}_current_price"
+        self._attr_unit_of_measurement = "NOK"
+
+    @property
+    def state(self):
+        """Returner total-prisen for gjeldende timeintervall."""
+        # Hent listen med timer fra koordinatoren
+        collections = self.coordinator.data.get("gridTariffCollections") or []
+        if not collections:
+            return None
+
+        hours = (
+            collections[0].get("gridTariff", {}).get("tariffPrice", {}).get("hours", [])
+        )
+        if not hours:
+            _LOGGER.debug("CurrentPrice: ingen timer i data")
+            return None
+
+        # Finn nåværende lokal tid (kan byttes til UTC om API gir UTC-tider)
+        now = datetime.now(timezone.utc).astimezone()
+        current_hour = now.hour
+        next_hour = (current_hour + 1) % 24
+        short_name = f"{current_hour:02d}-{next_hour:02d}"
+
+        # Let opp elementet med matching shortName
+        for hour in hours:
+            if hour.get("shortName") == short_name:
+                energy = hour.get("energyPrice") or {}
+                return energy.get("total")
+
+        # Returner None dersom ikke funnet
+        return None

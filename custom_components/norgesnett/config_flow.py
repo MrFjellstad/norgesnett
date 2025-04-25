@@ -39,7 +39,7 @@ class NorgesnettFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 if valid:
                     try:
                         return self.async_create_entry(
-                            title=user_input[CONF_CUSTOMER_ID], data=user_input
+                            title=user_input[CONF_METERINGPOINT_ID], data=user_input
                         )
                     except Exception as err:
                         _LOGGER.exception("Feil i async_create_entry %s", err)
