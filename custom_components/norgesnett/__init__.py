@@ -51,6 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     client = NorgesnettApiClient(customer_id, meteringpoint_id, session)
 
     coordinator = NorgesnettDataUpdateCoordinator(hass, client=client)
+    coordinator.entry_id = entry.entry_id
     await coordinator.async_refresh()
 
     if not coordinator.last_update_success:
@@ -85,8 +86,13 @@ class NorgesnettDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Update data via library."""
+
         try:
-            return await self.api.async_get_data()
+            result = await self.api.async_get_data()
+            if result is None:
+                raise UpdateFailed("No data received from API")
+            _LOGGER.debug("Norgesnett _async_update_data, incoming result = %s", result)
+            return result
         except Exception as exception:
             self.logger.error(exception)
             raise UpdateFailed() from exception

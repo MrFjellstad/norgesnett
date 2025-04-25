@@ -10,7 +10,7 @@ import async_timeout
 
 from .const import API_AUTH_URL, API_TARIFFS_URL
 
-TIMEOUT = 10
+TIMEOUT = 20
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 

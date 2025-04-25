@@ -1,27 +1,74 @@
 """Sensor platform for Norgesnett."""
 
-from .const import DEFAULT_NAME, DOMAIN, ICON, SENSOR
+import logging
+
+from .const import DEFAULT_NAME, DOMAIN, ICON
 from .entity import NorgesnettEntity
 
+_LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass, entry, async_add_devices):
+# PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+#     {
+#         # This is only needed if you want the some area but want the prices in a non local currency
+#         vol.Optional("currentFixedPriceLevel", default=""): cv.string,
+#         vol.Optional("monthlyTotal", default=0): cv.positive_float,
+#         vol.Optional("monthlyTotalExVat", default=0): cv.positive_float,
+#         vol.Optional("monthlyExTaxes", default=0): cv.positive_float,
+#         vol.Optional("monthlyTaxes", default=0): cv.positive_float,
+#         vol.Optional("monthlyUnitOfMeasure", default="Kr/month"): cv.string,
+#     }
+# )
+
+
+async def async_setup_entry(hass, entry, async_add_entities):
     """Setup sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_devices([NorgesnettSensor(coordinator, entry)])
+    data = coordinator.data  # antatt å være dict fra ditt API
+
+    mp_list = data["gridTariffCollections"][0]["meteringPointsAndPriceLevels"]
+    mp = mp_list[0]
+
+    items = {"currentFixedPriceLevel": mp["currentFixedPriceLevel"]["id"]}
+    # {"monthlyTotal": data["monthlyTotal"]},
+    # {"monthlyTotalExVat": data["monthlyTotalExVat"]},
+    # {"monthlyExTaxes": data["monthlyExTaxes"]},
+    # {"monthlyTaxes": data["monthlyTaxes"]},
+    # {"monthlyUnitOfMeasure": data["monthlyUnitOfMeasure"]},
+
+    entities = [
+        NorgesnettSensor(coordinator, entry, key, value) for key, value in items.items()
+    ]
+
+    async_add_entities(entities, update_before_add=True)
+
+    # async_add_devices([NorgesnettSensor(coordinator, entry)])
 
 
 class NorgesnettSensor(NorgesnettEntity):
     """norgesnett Sensor class."""
 
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return f"{DEFAULT_NAME}_{SENSOR}"
+    def __init__(self, coordinator, config_entry, key: str, initial_value):
+        super().__init__(coordinator, config_entry)
+        # self.coordinator = coordinator
+        # self._entry_id = entry_id
+        self._key = key
+        self._attr_unique_id = f"{config_entry.entry_id}_{key}"
+        self._attr_native_value = initial_value
 
     @property
     def state(self):
-        """Return the state of the sensor."""
-        return self.coordinator.data.get("body")
+        # Returner siste verdi fra koordinator, evt. fallback til init
+        return self.coordinator.data.get(self._key, self._attr_native_value)
+
+    @property
+    def name(self):
+        """Return the name of the sensor."""
+        return f"{DEFAULT_NAME}_{self._key}"
+
+    # @property
+    # def state(self):
+    #     """Return the state of the sensor."""
+    #     return self.coordinator.data.get("body")
 
     @property
     def icon(self):
