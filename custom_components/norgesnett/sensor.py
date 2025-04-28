@@ -1,9 +1,11 @@
 """Sensor platform for Norgesnett."""
 
+import json
 import logging
-from datetime import datetime, timezone
 
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.helpers.event import async_track_time_change
+from homeassistant.util.dt import now
 
 from .const import DEFAULT_NAME, DOMAIN, ICON
 from .entity import NorgesnettEntity
@@ -86,6 +88,20 @@ class NorgesnettHourlyPricesSensor(NorgesnettEntity, SensorEntity):
         self._attr_unique_id = f"{config_entry.entry_id}_hourly_prices"
 
     @property
+    def icon(self):
+        return ICON
+
+    @property
+    def device_class(self):
+        # Monetary values per kWh
+        return "monetary"
+
+    @property
+    def state_class(self):
+        # Measurement for graphing
+        return "measurement"
+
+    @property
     def state(self):
         # Du kan for eksempel returnere antall perioder:
         collections = self.coordinator.data.get("gridTariffCollections") or []
@@ -96,31 +112,57 @@ class NorgesnettHourlyPricesSensor(NorgesnettEntity, SensorEntity):
         hours = (
             collections[0].get("gridTariff", {}).get("tariffPrice", {}).get("hours", [])
         )
-        return len(hours)
+        # Bygg opp dict som før
+        result = {
+            entry.get("shortName"): {
+                "total": entry.get("energyPrice", {}).get("total"),
+                "totalExVat": entry.get("energyPrice", {}).get("totalExVat"),
+            }
+            for entry in hours
+            if entry.get("shortName") and entry.get("energyPrice")
+        }
+        # Returner som kompakt JSON
+        return json.dumps(result)
 
-    @property
-    def extra_state_attributes(self):
-        """Returner dict med shortName som nøkkel, og total/totalExVat som verdi."""
-        result = {}
-        for hour in self.coordinator.data.get("hours", []):
-            sn = hour.get("shortName")
-            ep = hour.get("energyPrice", {})
-            if sn and ep:
-                result[sn] = {
-                    "total": ep.get("total"),
-                    "totalExVat": ep.get("totalExVat"),
-                }
-        return result
+    def name(self):
+        return f"{DEFAULT_NAME} Hourly Prices (JSON)"
 
 
 class NorgesnettCurrentPriceSensor(NorgesnettEntity, SensorEntity):
     """Sensor som viser dagens pris for gjeldende time."""
+
+    @property
+    def device_class(self):
+        return "monetary"
+
+    @property
+    def state_class(self):
+        return "measurement"
 
     def __init__(self, coordinator, config_entry):
         super().__init__(coordinator, config_entry)
         self._attr_name = f"{DEFAULT_NAME} Current Hour Price"
         self._attr_unique_id = f"{config_entry.entry_id}_current_price"
         self._attr_unit_of_measurement = "NOK"
+        self._unsub_time_listener = None
+
+    async def async_added_to_hass(self):
+        """Når sensoren legges til, schedule oppdatering på hver hel time."""
+        # Kall _update_state klokken H:00:00 hvert minutt
+        self._unsub_time_listener = async_track_time_change(
+            self.hass, self._update_state, second=0
+        )
+
+    async def async_will_remove_from_hass(self):
+        """Rydd opp når sensoren fjernes."""
+        if self._unsub_time_listener:
+            self._unsub_time_listener()
+            self._unsub_time_listener = None
+
+    def _update_state(self, now_time):
+        """Tving HA til å oppdatere state, uten å hente ny data fra API."""
+        # force_refresh=False: vi bruker fremdeles gammel coordinator.data
+        self.async_schedule_update_ha_state(force_refresh=False)
 
     @property
     def state(self):
@@ -138,8 +180,8 @@ class NorgesnettCurrentPriceSensor(NorgesnettEntity, SensorEntity):
             return None
 
         # Finn nåværende lokal tid (kan byttes til UTC om API gir UTC-tider)
-        now = datetime.now(timezone.utc).astimezone()
-        current_hour = now.hour
+        current = now()
+        current_hour = current.hour
         next_hour = (current_hour + 1) % 24
         short_name = f"{current_hour:02d}-{next_hour:02d}"
 

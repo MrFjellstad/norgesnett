@@ -14,20 +14,36 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-**TO BE REMOVED: If you need help, as a developer, to use this custom component tempalte,
-please look at the [User Guide in the Cookiecutter documentation](https://cookiecutter-homeassistant-custom-component.readthedocs.io/en/stable/quickstart.html)**
+**Integrasjon for å hente ut informasjon fra nettlevrandøren Norgesnett.**
+Den er tilpasset et målerpunkt, api'et til Norgesnett vil hente ut informasjon fra flere.
+
+Jeg har bare et målerpunkt så jeg har ikke sett for mye på hvordan det bør løses om man har fler.
 
 **This component will set up the following platforms.**
 
-| Platform        | Description                         |
-| --------------- | ----------------------------------- |
-| `binary_sensor` | Show something `True` or `False`.   |
-| `sensor`        | Show info from Norgesnett API.      |
-| `switch`        | Switch something `True` or `False`. |
+| Platform | Description                    |
+| -------- | ------------------------------ |
+| `sensor` | Show info from Norgesnett API. |
 
-![example][exampleimg]
+**Componenten tilbyr disse entitetene.**
+| Entitet | Beskrivelse |
+| --------------- | ---------------------------------------------------- |
+| `currentFixedPriceLevel` | Viser prisnivået. |
+| `monthlyTotal` | Viser månedspåslaget for gjeldende prisnivå |
+| `monthlyTotalExVat` | Samme påslag, ekskl. mva. |
+| `monthlyExTaxes` | Samme påslag, ekskl. skatter. |
+| `monthlyTaxes` | Skatter denne måneden. |
+| `monthlyUnitOfMeasure` | Kr/month |
+| `hourly_prices` | Liste over timesprisene (JSON) |
+| `current_price` | Gjeldende pris denne timen |
+
+Prisene lastes ned daglig, current_price oppdateres fortløpende
 
 ## Installation
+
+Bruk HACS!
+
+Alternativt:
 
 1. Using the tool of choice open the directory (folder) for your HA configuration (where you find `configuration.yaml`).
 2. If you do not have a `custom_components` directory (folder) there, you need to create it.
@@ -57,9 +73,27 @@ custom_components/norgesnett/sensor.py
 custom_components/norgesnett/switch.py
 ```
 
-## Configuration is done in the UI
+## Template for å vise total strømpris
 
-<!---->
+Denne legger sammen nettleie for den aktuelle timen, spot pbis fra norgesnett og evt. påslag fra strømleverandøren din. Sensoren for nordpool og spotpris må oppdateres før bruk.
+
+```yaml
+- platform: template
+  sensors:
+    nettleie_plus_spot_og_paaslag_pris:
+      friendly_name: "Norgesnett + Nordpool"
+      unit_of_measurement: "NOK/kWh"
+      icon_template: mdi:cash-fast
+      value_template: >-
+        {%- set nettleie = states('sensor.norgesnett_current_hour_price') | float(0) -%}
+        {%- set spotpris  = states('sensor.nordpool_kwh_no1_nok_3_10_025') | float(0) -%}
+        {%- set paaslag  = -0.01 -%}
+        {%- if spotpris > 0.9375 -%}
+          {{ ((pool - 0.9375) * 0.90) + 0.9375 + nettleie + paaslag }}
+        {%- else -%}
+          {{ nettleie + spotpris + paaslag }}
+        {%- endif -%}
+```
 
 ## Contributions are welcome!
 
