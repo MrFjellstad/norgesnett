@@ -53,29 +53,11 @@ Alternativt:
 6. Restart Home Assistant
 7. In the HA UI go to "Configuration" -> "Integrations" click "+" and search for "Norgesnett"
 
-Using your HA configuration directory (folder) as a starting point you should now also have this:
-
-```text
-custom_components/norgesnett/translations/en.json
-custom_components/norgesnett/translations/fr.json
-custom_components/norgesnett/translations/nb.json
-custom_components/norgesnett/translations/sensor.en.json
-custom_components/norgesnett/translations/sensor.fr.json
-custom_components/norgesnett/translations/sensor.nb.json
-custom_components/norgesnett/translations/sensor.nb.json
-custom_components/norgesnett/__init__.py
-custom_components/norgesnett/api.py
-custom_components/norgesnett/binary_sensor.py
-custom_components/norgesnett/config_flow.py
-custom_components/norgesnett/const.py
-custom_components/norgesnett/manifest.json
-custom_components/norgesnett/sensor.py
-custom_components/norgesnett/switch.py
-```
-
 ## Template for å vise total strømpris
 
 Denne legger sammen nettleie for den aktuelle timen, spot pbis fra norgesnett og evt. påslag fra strømleverandøren din. Sensoren for nordpool og spotpris må oppdateres før bruk.
+
+Den skal vise riktig pris når strømstøtten er fratrukke.
 
 ```yaml
 - platform: template
