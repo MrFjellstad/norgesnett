@@ -71,7 +71,7 @@ Den skal vise riktig pris når strømstøtten er fratrukke.
         {%- set spotpris  = states('sensor.nordpool_kwh_no1_nok_3_10_025') | float(0) -%}
         {%- set paaslag  = -0.01 -%}
         {%- if spotpris > 0.9375 -%}
-          {{ ((pool - 0.9375) * 0.90) + 0.9375 + nettleie + paaslag }}
+          {{ ((spotpris - 0.9375) * 0.10) + 0.9375 + nettleie + paaslag }}
         {%- else -%}
           {{ nettleie + spotpris + paaslag }}
         {%- endif -%}
