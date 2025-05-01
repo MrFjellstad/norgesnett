@@ -16,10 +16,29 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass, entry, async_add_entities):
     """Setup sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    data = coordinator.data  # antatt å være dict fra ditt API
+    data = coordinator.data or {}
+
+    collections = data.get("gridTariffCollections") or []
+
+    if not collections:
+        _LOGGER.error(
+            "Norgesnett: Ingen gridTariffCollections i data, hopper over sensor-setup"
+        )
+        return None
 
     mp_list = data["gridTariffCollections"][0]["meteringPointsAndPriceLevels"]
-    mp = mp_list[0]
+
+    if not mp_list:
+        _LOGGER.error(
+            "Norgesnett: Ingen gridTariff, hopper over sensor-setup for prisnivå"
+        )
+        # return None
+
+    if len(mp_list) > 1:
+        mp = mp_list[0]
+        currentPriceLevel = mp["currentPriceLevel"]["id"]
+    else:
+        currentPriceLevel = "Effektnivå er ikke satt"
 
     fixedPrices_list = data["gridTariffCollections"][0]["gridTariff"]["tariffPrice"][
         "priceInfo"
@@ -27,7 +46,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     fixedPrices = fixedPrices_list[0]
 
     items = {
-        "currentFixedPriceLevel": mp["currentFixedPriceLevel"]["id"],
+        "currentFixedPriceLevel": currentPriceLevel,
         "monthlyTotal": fixedPrices["priceLevels"][0]["monthlyTotal"],
         "monthlyTotalExVat": fixedPrices["priceLevels"][0]["monthlyTotalExVat"],
         "monthlyExTaxes": fixedPrices["priceLevels"][0]["monthlyExTaxes"],
@@ -162,7 +181,9 @@ class NorgesnettCurrentPriceSensor(NorgesnettEntity, SensorEntity):
     def _update_state(self, now_time):
         """Tving HA til å oppdatere state, uten å hente ny data fra API."""
         # force_refresh=False: vi bruker fremdeles gammel coordinator.data
-        self.async_schedule_update_ha_state(force_refresh=False)
+        self.hass.loop.call_soon_threadsafe(
+            self.async_schedule_update_ha_state, False  # force_refresh=False
+        )
 
     @property
     def state(self):

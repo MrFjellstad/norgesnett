@@ -90,6 +90,10 @@ class NorgesnettDataUpdateCoordinator(DataUpdateCoordinator):
             if result is None:
                 raise UpdateFailed("No data received from API")
             _LOGGER.debug("Norgesnett _async_update_data, incoming result = %s", result)
+
+            collections = result.get("gridTariffCollections") or []
+            if not collections:
+                raise UpdateFailed("Ingen gridTariffCollections i respons")
             return result
         except Exception as exception:
             self.logger.error(exception)
