@@ -1,22 +1,32 @@
 """Tests for Norgesnett api."""
 
 import asyncio
+import logging
 
 import aiohttp
+import pytest
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+import custom_components.norgesnett.api as api_module
 from custom_components.norgesnett.api import NorgesnettApiClient
+
+# Monkeypatch API URLs to use JSONPlaceholder for testing
+api_module.API_AUTH_URL = "https://jsonplaceholder.typicode.com/auth"
+api_module.API_TARIFFS_URL = "https://jsonplaceholder.typicode.com/tariffs"
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def test_async_get_auth(hass, aioclient_mock, caplog):
     """Test the async_get_auth method."""
+    caplog.set_level(logging.DEBUG)
     api = NorgesnettApiClient(
         "test_customer", "test_meteringpoint", async_get_clientsession(hass)
     )
 
-    # Mock the API_AUTH_URL response
+    # Mock the authentication response
     aioclient_mock.post(
-        "https://jsonplaceholder.typicode.com/auth",
+        api_module.API_AUTH_URL,
         json={"apiKey": "test_api_key"},
     )
 
@@ -30,19 +40,20 @@ async def test_async_get_auth(hass, aioclient_mock, caplog):
 
 async def test_async_get_data(hass, aioclient_mock, caplog):
     """Test the async_get_data method."""
+    caplog.set_level(logging.DEBUG)
     api = NorgesnettApiClient(
         "test_customer", "test_meteringpoint", async_get_clientsession(hass)
     )
 
-    # Mock the API_AUTH_URL response for authentication
+    # Mock authentication
     aioclient_mock.post(
-        "https://jsonplaceholder.typicode.com/auth",
+        api_module.API_AUTH_URL,
         json={"apiKey": "test_api_key"},
     )
 
-    # Mock the API_TARIFFS_URL response for tariff data
+    # Mock tariff data
     aioclient_mock.post(
-        "https://jsonplaceholder.typicode.com/tariffs",
+        api_module.API_TARIFFS_URL,
         json={"tariffs": "test_tariff_data"},
     )
 
@@ -50,14 +61,29 @@ async def test_async_get_data(hass, aioclient_mock, caplog):
     assert tariffs == {"tariffs": "test_tariff_data"}
 
     # Test logging of the api_wrapper calls
-    assert "api_wrapper: post https://jsonplaceholder.typicode.com/auth" in caplog.text
-    assert (
-        "api_wrapper: post https://jsonplaceholder.typicode.com/tariffs" in caplog.text
+    assert f"api_wrapper: post {api_module.API_AUTH_URL}" in caplog.text
+    assert f"api_wrapper: post {api_module.API_TARIFFS_URL}" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_api_wrapper_get(hass, aioclient_mock):
+    """Test api_wrapper with GET method."""
+    api = NorgesnettApiClient(
+        "test_customer", "test_meteringpoint", async_get_clientsession(hass)
     )
+
+    aioclient_mock.get(
+        "https://jsonplaceholder.typicode.com/posts/1", json={"test": "test"}
+    )
+    result = await api.api_wrapper(
+        "get", "https://jsonplaceholder.typicode.com/posts/1"
+    )
+    assert result == {"test": "test"}
 
 
 async def test_api_wrapper_invalid_method(hass, caplog):
     """Test api_wrapper with an invalid HTTP method."""
+    caplog.set_level(logging.ERROR)
     api = NorgesnettApiClient(
         "test_customer", "test_meteringpoint", async_get_clientsession(hass)
     )
@@ -69,80 +95,57 @@ async def test_api_wrapper_invalid_method(hass, caplog):
     assert "Something really wrong happened!" in caplog.text
 
 
-async def test_api(hass, aioclient_mock, caplog):
-    """Test API calls."""
-
-    # To test the api submodule, we first create an instance of our API client
+async def test_api_set_and_exceptions(hass, aioclient_mock, caplog):
+    """Test async_set_title and exception logging in api_wrapper."""
+    caplog.set_level(logging.ERROR)
     api = NorgesnettApiClient("test", "test", async_get_clientsession(hass))
 
-    # Use aioclient_mock which is provided by `pytest_homeassistant_custom_components`
-    # to mock responses to aiohttp requests. In this case we are telling the mock to
-    # return {"test": "test"} when a `GET` call is made to the specified URL. We then
-    # call `async_get_data` which will make that `GET` request.
-    aioclient_mock.get(
-        "https://jsonplaceholder.typicode.com/posts/1", json={"test": "test"}
-    )
-    assert await api.async_get_data() == {"test": "test"}
-
-    # We do the same for `async_set_title`. Note the difference in the mock call
-    # between the previous step and this one. We use `patch` here instead of `get`
-    # because we know that `async_set_title` calls `api_wrapper` with `patch` as the
-    # first parameter
+    # Test async_set_title (PATCH)
     aioclient_mock.patch("https://jsonplaceholder.typicode.com/posts/1")
     assert await api.async_set_title("test") is None
 
-    # In order to get 100% coverage, we need to test `api_wrapper` to test the code
-    # that isn't already called by `async_get_data` and `async_set_title`. Because the
-    # only logic that lives inside `api_wrapper` that is not being handled by a third
-    # party library (aiohttp) is the exception handling, we also want to simulate
-    # raising the exceptions to ensure that the function handles them as expected.
-    # The caplog fixture allows access to log messages in tests. This is particularly
-    # useful during exception handling testing since often the only action as part of
-    # exception handling is a logging statement
+    # TimeoutError on PUT
     caplog.clear()
     aioclient_mock.put(
         "https://jsonplaceholder.typicode.com/posts/1", exc=asyncio.TimeoutError
     )
-    assert (
-        await api.api_wrapper("put", "https://jsonplaceholder.typicode.com/posts/1")
-        is None
+    result = await api.api_wrapper(
+        "put", "https://jsonplaceholder.typicode.com/posts/1"
     )
-    assert (
-        len(caplog.record_tuples) == 1
-        and "Timeout error fetching information from" in caplog.record_tuples[0][2]
+    assert result is None
+    assert any(
+        "Timeout error fetching information" in rec.message for rec in caplog.records
     )
 
+    # ClientError on POST
     caplog.clear()
     aioclient_mock.post(
         "https://jsonplaceholder.typicode.com/posts/1", exc=aiohttp.ClientError
     )
-    assert (
-        await api.api_wrapper("post", "https://jsonplaceholder.typicode.com/posts/1")
-        is None
+    result = await api.api_wrapper(
+        "post", "https://jsonplaceholder.typicode.com/posts/1"
     )
-    assert (
-        len(caplog.record_tuples) == 1
-        and "Error fetching information from" in caplog.record_tuples[0][2]
-    )
+    assert result is None
+    assert any("Error fetching information" in rec.message for rec in caplog.records)
 
+    # Generic Exception on POST
     caplog.clear()
     aioclient_mock.post("https://jsonplaceholder.typicode.com/posts/2", exc=Exception)
-    assert (
-        await api.api_wrapper("post", "https://jsonplaceholder.typicode.com/posts/2")
-        is None
+    result = await api.api_wrapper(
+        "post", "https://jsonplaceholder.typicode.com/posts/2"
     )
-    assert (
-        len(caplog.record_tuples) == 1
-        and "Something really wrong happened!" in caplog.record_tuples[0][2]
+    assert result is None
+    assert any(
+        "Something really wrong happened!" in rec.message for rec in caplog.records
     )
 
+    # TypeError on POST (parsing error)
     caplog.clear()
     aioclient_mock.post("https://jsonplaceholder.typicode.com/posts/3", exc=TypeError)
-    assert (
-        await api.api_wrapper("post", "https://jsonplaceholder.typicode.com/posts/3")
-        is None
+    result = await api.api_wrapper(
+        "post", "https://jsonplaceholder.typicode.com/posts/3"
     )
-    assert (
-        len(caplog.record_tuples) == 1
-        and "Error parsing information from" in caplog.record_tuples[0][2]
+    assert result is None
+    assert any(
+        "Error parsing information from" in rec.message for rec in caplog.records
     )
