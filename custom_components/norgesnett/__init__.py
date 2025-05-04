@@ -36,7 +36,11 @@ SCAN_INTERVAL = timedelta(days=1)
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+try:
+    CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+except AttributeError:
+    # Fallback for test- eller eldre HA-versjoner uten config_entry_only_config_schema
+    CONFIG_SCHEMA = {}
 
 
 async def async_setup(hass: HomeAssistant, config: Config):
