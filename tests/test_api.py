@@ -8,6 +8,67 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from custom_components.norgesnett.api import NorgesnettApiClient
 
 
+async def test_async_get_auth(hass, aioclient_mock, caplog):
+    """Test the async_get_auth method."""
+    api = NorgesnettApiClient(
+        "test_customer", "test_meteringpoint", async_get_clientsession(hass)
+    )
+
+    # Mock the API_AUTH_URL response
+    aioclient_mock.post(
+        "https://jsonplaceholder.typicode.com/auth",
+        json={"apiKey": "test_api_key"},
+    )
+
+    auth_info = await api.async_get_auth()
+    assert auth_info == {"apiKey": "test_api_key"}
+
+    # Test logging of the apiKey
+    assert "apiKey:" in caplog.text
+    assert "test_api_key" in caplog.text
+
+
+async def test_async_get_data(hass, aioclient_mock, caplog):
+    """Test the async_get_data method."""
+    api = NorgesnettApiClient(
+        "test_customer", "test_meteringpoint", async_get_clientsession(hass)
+    )
+
+    # Mock the API_AUTH_URL response for authentication
+    aioclient_mock.post(
+        "https://jsonplaceholder.typicode.com/auth",
+        json={"apiKey": "test_api_key"},
+    )
+
+    # Mock the API_TARIFFS_URL response for tariff data
+    aioclient_mock.post(
+        "https://jsonplaceholder.typicode.com/tariffs",
+        json={"tariffs": "test_tariff_data"},
+    )
+
+    tariffs = await api.async_get_data()
+    assert tariffs == {"tariffs": "test_tariff_data"}
+
+    # Test logging of the api_wrapper calls
+    assert "api_wrapper: post https://jsonplaceholder.typicode.com/auth" in caplog.text
+    assert (
+        "api_wrapper: post https://jsonplaceholder.typicode.com/tariffs" in caplog.text
+    )
+
+
+async def test_api_wrapper_invalid_method(hass, caplog):
+    """Test api_wrapper with an invalid HTTP method."""
+    api = NorgesnettApiClient(
+        "test_customer", "test_meteringpoint", async_get_clientsession(hass)
+    )
+
+    result = await api.api_wrapper(
+        "invalid_method", "https://jsonplaceholder.typicode.com/invalid"
+    )
+    assert result is None
+    assert "Something really wrong happened!" in caplog.text
+
+
 async def test_api(hass, aioclient_mock, caplog):
     """Test API calls."""
 
