@@ -81,6 +81,31 @@ async def test_api_wrapper_get(hass, aioclient_mock):
     assert result == {"test": "test"}
 
 
+async def test_api_wrapper_put_and_patch(hass, aioclient_mock):
+    """Test api_wrapper PUT and PATCH methods returning JSON."""
+    api = NorgesnettApiClient(
+        "test_customer", "test_meteringpoint", async_get_clientsession(hass)
+    )
+
+    # Mock PUT
+    aioclient_mock.put(
+        "https://jsonplaceholder.typicode.com/posts/2", json={"foo": "bar"}
+    )
+    result_put = await api.api_wrapper(
+        "put", "https://jsonplaceholder.typicode.com/posts/2"
+    )
+    assert result_put == {"foo": "bar"}
+
+    # Mock PATCH
+    aioclient_mock.patch(
+        "https://jsonplaceholder.typicode.com/posts/3", json={"baz": 123}
+    )
+    result_patch = await api.api_wrapper(
+        "patch", "https://jsonplaceholder.typicode.com/posts/3"
+    )
+    assert result_patch == {"baz": 123}
+
+
 async def test_api_wrapper_invalid_method(hass, caplog):
     """Test api_wrapper with an invalid HTTP method."""
     caplog.set_level(logging.ERROR)
