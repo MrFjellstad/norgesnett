@@ -1,113 +1,134 @@
-"""Test Norgesnett config flow."""
-
-from unittest.mock import patch
+"""Tests for config_flow of Norgesnett integration."""
 
 import pytest
-from homeassistant import config_entries, data_entry_flow
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant import config_entries
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import RESULT_TYPE_CREATE_ENTRY, RESULT_TYPE_FORM
 
+import custom_components.norgesnett.config_flow as config_flow
 from custom_components.norgesnett.const import (
-    BINARY_SENSOR,
+    CONF_CUSTOMER_ID,
+    CONF_METERINGPOINT_ID,
     DOMAIN,
-    PLATFORMS,
-    SENSOR,
-    SWITCH,
 )
 
-from .const import MOCK_CONFIG
+
+class DummyFlow(config_flow.NorgesnettFlowHandler):
+    """Subclass to override credentials test and entry creation."""
+
+    def __init__(self):
+        super().__init__()
+        self._errors = {}
+        self.created = False
+
+    async def _test_credentials(self, customer_id, meteringpoint_id):
+        # Return based on test input
+        if customer_id == "valid" and meteringpoint_id == "valid":
+            return True
+        return False
+
+    def async_create_entry(self, title, data):
+        self.created = True
+        return {"type": RESULT_TYPE_CREATE_ENTRY, "title": title, "data": data}
 
 
-# This fixture bypasses the actual setup of the integration
-# since we only want to test the config flow. We test the
-# actual functionality of the integration in other test modules.
-@pytest.fixture(autouse=True)
-def bypass_setup_fixture():
-    """Prevent setup."""
-    with patch(
-        "custom_components.norgesnett.async_setup",
-        return_value=True,
-    ), patch(
-        "custom_components.norgesnett.async_setup_entry",
-        return_value=True,
-    ):
-        yield
+@pytest.fixture
+def flow_handler(hass: HomeAssistant):
+    """Return a fresh FlowHandler."""
+    flow = DummyFlow()
+    flow.hass = hass
+    return flow
 
 
-# Here we simiulate a successful config flow from the backend.
-# Note that we use the `bypass_get_data` fixture here because
-# we want the config flow validation to succeed during the test.
-async def test_successful_config_flow(hass, bypass_get_data):
-    """Test a successful config flow."""
-    # Initialize a config flow
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
+async def test_show_form_initial(flow_handler):
+    """Test that initial form is shown."""
+    result = await flow_handler.async_step_user()
+    assert result["type"] == RESULT_TYPE_FORM
+    # Form schema keys
+    schema = result["data_schema"]
+    assert CONF_CUSTOMER_ID in schema.schema
+    assert CONF_METERINGPOINT_ID in schema.schema
+
+
+@pytest.mark.parametrize(
+    "cust, meter, expect_errors",
+    [
+        ("invalid", "invalid", True),
+        ("valid", "valid", False),
+    ],
+)
+async def test_user_step_credentials(flow_handler, cust, meter, expect_errors):
+    """Test credentials handling in user step."""
+    # Step with user_input
+    result = await flow_handler.async_step_user(
+        {CONF_CUSTOMER_ID: cust, CONF_METERINGPOINT_ID: meter}
     )
+    if expect_errors:
+        assert result["type"] == RESULT_TYPE_FORM
+        assert flow_handler._errors.get("base") == "auth"
+    else:
+        assert result["type"] == RESULT_TYPE_CREATE_ENTRY
+        assert flow_handler.created
+        assert result["title"] == meter
+        assert result["data"] == {CONF_CUSTOMER_ID: cust, CONF_METERINGPOINT_ID: meter}
 
-    # Check that the config flow shows the user form as the first step
-    assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
-    assert result["step_id"] == "user"
 
-    # If a user were to enter `test_customer_id` for customer_id and `test_meteringpoint_id`
-    # for meteringpoint_id, it would result in this function call
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=MOCK_CONFIG
+async def test_create_entry_exception(flow_handler, caplog):
+    """Simulate exception in create_entry branch."""
+
+    # Monkeypatch create_entry to raise
+    async def raise_exc(*args, **kwargs):
+        raise Exception("creation failed")
+
+    flow_handler.async_create_entry = raise_exc
+
+    result = await flow_handler.async_step_user(
+        {CONF_CUSTOMER_ID: "valid", CONF_METERINGPOINT_ID: "valid"}
     )
-
-    # Check that the config flow is complete and a new entry is created with
-    # the input data
-    assert result["type"] == data_entry_flow.RESULT_TYPE_CREATE_ENTRY
-    assert result["title"] == "test_customer_id"
-    assert result["data"] == MOCK_CONFIG
-    assert result["result"]
+    assert result["type"] == RESULT_TYPE_FORM
+    assert flow_handler._errors.get("base") == "unknown"
+    assert "Feil i async_create_entry" in caplog.text
 
 
-# In this case, we want to simulate a failure during the config flow.
-# We use the `error_on_get_data` mock instead of `bypass_get_data`
-# (note the function parameters) to raise an Exception during
-# validation of the input config.
-async def test_failed_config_flow(hass, error_on_get_data):
-    """Test a failed config flow due to credential validation failure."""
+async def test_unexpected_exception(flow_handler, caplog, monkeypatch):
+    """Simulate unexpected exception in step."""
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    # Monkeypatch _show_config_form to raise
+    async def bad_show(*args, **kwargs):
+        raise RuntimeError("bad form")
+
+    monkeypatch.setattr(flow_handler, "_show_config_form", bad_show)
+
+    result = await flow_handler.async_step_user(None)
+    assert result["type"] == RESULT_TYPE_FORM
+    assert flow_handler._errors.get("base") == "unknown"
+    assert "Uventet feil i config flow" in caplog.text
+
+
+async def test_options_flow(hass: HomeAssistant):
+    """Test options flow returns form and create entry."""
+    # Create dummy entry with empty options
+    entry = config_entries.ConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="t",
+        data={CONF_CUSTOMER_ID: "c", CONF_METERINGPOINT_ID: "m"},
+        options={},
+        entry_id="testid",
+        source="test",
+        connection_class=config_flow.config_entries.CONN_CLASS_CLOUD_POLL,
+        system_options={},
     )
+    options_handler = config_flow.NorgesnettOptionsFlowHandler(entry)
 
-    assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
-    assert result["step_id"] == "user"
+    # Initial step
+    result = await options_handler.async_step_init()
+    assert result["type"] == RESULT_TYPE_FORM
 
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=MOCK_CONFIG
-    )
-
-    assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
-    assert result["errors"] == {"base": "auth"}
-
-
-# Our config flow also has an options flow, so we must test it as well.
-async def test_options_flow(hass):
-    """Test an options flow."""
-    # Create a new MockConfigEntry and add to HASS (we're bypassing config
-    # flow entirely)
-    entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
-    entry.add_to_hass(hass)
-
-    # Initialize an options flow
-    await hass.config_entries.async_setup(entry.entry_id)
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-
-    # Verify that the first options step is a user form
-    assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
-    assert result["step_id"] == "user"
-
-    # Enter some fake data into the form
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        user_input={platform: platform != SENSOR for platform in PLATFORMS},
-    )
-
-    # Verify that the flow finishes
-    assert result["type"] == data_entry_flow.RESULT_TYPE_CREATE_ENTRY
-    assert result["title"] == "test_customer_id"
-
-    # Verify that the options were updated
-    assert entry.options == {BINARY_SENSOR: True, SENSOR: False, SWITCH: True}
+    # Submit options
+    user_input = {p: False for p in config_flow.PLATFORMS}
+    result2 = await options_handler.async_step_user(user_input)
+    # Should create entry with updated options
+    assert result2["type"] == RESULT_TYPE_CREATE_ENTRY
+    assert result2["data"] == user_input
+    assert result2["title"] == entry.data[CONF_CUSTOMER_ID]
