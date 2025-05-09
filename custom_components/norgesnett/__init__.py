@@ -6,12 +6,18 @@ https://github.com/MrFjellstad/norgesnett
 """
 
 import asyncio
+import importlib
 import logging
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.core_config import Config
+
+if importlib.util.find_spec("homeassistant.core_config"):
+    from homeassistant.core_config import Config
+else:
+    from homeassistant.core import Config
+
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -30,7 +36,11 @@ SCAN_INTERVAL = timedelta(days=1)
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+try:
+    CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+except AttributeError:
+    # Fallback for test- eller eldre HA-versjoner uten config_entry_only_config_schema
+    CONFIG_SCHEMA = {}
 
 
 async def async_setup(hass: HomeAssistant, config: Config):
