@@ -34,9 +34,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         )
         # return None
 
-    if len(mp_list) > 1:
+    if len(mp_list) > 0:
         mp = mp_list[0]
-        currentPriceLevel = mp["currentPriceLevel"]["id"]
+        currentPriceLevel = mp["currentFixedPriceLevel"]["id"]
     else:
         currentPriceLevel = "Effektnivå er ikke satt"
 
