@@ -14,7 +14,7 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-**Integrasjon for å hente ut informasjon fra nettlevrandøren Norgesnett.**
+**Integrasjon for å hente ut informasjon fra nettleverandøren Norgesnett.**
 Den er tilpasset et målerpunkt, api'et til Norgesnett vil hente ut informasjon fra flere.
 
 Jeg har bare et målerpunkt så jeg har ikke sett for mye på hvordan det bør løses om man har fler.

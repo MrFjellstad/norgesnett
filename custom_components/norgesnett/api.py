@@ -38,7 +38,7 @@ class NorgesnettApiClient:
             },
         )
         apiKey = auth_info["apiKey"]
-        _LOGGER.debug("apiKey:", apiKey)
+        _LOGGER.debug("apiKey: %s", apiKey)
         return auth_info
 
     async def async_get_data(self) -> dict:
@@ -78,54 +78,72 @@ class NorgesnettApiClient:
     #     await self.api_wrapper("patch", url, data={"title": value}, headers=HEADERS)
 
     async def api_wrapper(
-        self, method: str, url: str, data: dict = {}, headers: dict = {}
+        self,
+        method: str,
+        url: str,
+        data: dict | None = None,
+        headers: dict | None = None,
+        max_attempts: int = 3,
+        base_delay: float = 1.0,
     ) -> dict:
-        """Get information from the API."""
+        """Get information from the API with retry and exponential backoff."""
         _LOGGER.info("api_wrapper: %s %s", method, url)
         data = {} if data is None else data
         headers = {} if headers is None else headers
-        try:
-            async with async_timeout.timeout(TIMEOUT):
-                if method == "get":
-                    response = await self._session.get(url, headers=headers)
-                    response.raise_for_status()
-                    return await response.json()
 
-                elif method == "put":
-                    response = await self._session.put(url, headers=headers, json=data)
-                    response.raise_for_status()
-                    return await response.json()
+        delay = base_delay
+        for attempt in range(1, max_attempts + 1):
+            try:
+                async with async_timeout.timeout(TIMEOUT):
+                    if method == "get":
+                        response = await self._session.get(url, headers=headers)
+                        response.raise_for_status()
+                        return await response.json()
 
-                elif method == "patch":
-                    response = await self._session.patch(
-                        url, headers=headers, json=data
+                    if method == "put":
+                        response = await self._session.put(
+                            url, headers=headers, json=data
+                        )
+                        response.raise_for_status()
+                        return await response.json()
+
+                    if method == "patch":
+                        response = await self._session.patch(
+                            url, headers=headers, json=data
+                        )
+                        response.raise_for_status()
+                        return await response.json()
+
+                    if method == "post":
+                        response = await self._session.post(
+                            url, headers=headers, json=data
+                        )
+                        response.raise_for_status()
+                        return await response.json()
+
+            except (asyncio.TimeoutError, aiohttp.ClientError, socket.gaierror) as exception:
+                _LOGGER.error(
+                    "Attempt %s/%s error fetching information from %s - %s",
+                    attempt,
+                    max_attempts,
+                    url,
+                    exception,
+                )
+                if attempt == max_attempts:
+                    _LOGGER.error(
+                        "All attempts to fetch information from %s failed", url
                     )
-                    response.raise_for_status()
-                    return await response.json()
-
-                elif method == "post":
-                    response = await self._session.post(url, headers=headers, json=data)
-                    response.raise_for_status()
-                    return await response.json()
-
-        except asyncio.TimeoutError as exception:
-            _LOGGER.error(
-                "Timeout error fetching information from %s - %s",
-                url,
-                exception,
-            )
-
-        except (KeyError, TypeError) as exception:
-            _LOGGER.error(
-                "Error parsing information from %s - %s",
-                url,
-                exception,
-            )
-        except (aiohttp.ClientError, socket.gaierror) as exception:
-            _LOGGER.error(
-                "Error fetching information from %s - %s",
-                url,
-                exception,
-            )
-        except Exception as exception:  # pylint: disable=broad-except
-            _LOGGER.error("Something really wrong happened! - %s", exception)
+                    raise
+                await asyncio.sleep(delay)
+                delay *= 2
+            except (KeyError, TypeError) as exception:
+                _LOGGER.error(
+                    "Error parsing information from %s - %s",
+                    url,
+                    exception,
+                )
+                raise
+            except Exception as exception:  # pylint: disable=broad-except
+                _LOGGER.error("Something really wrong happened! - %s", exception)
+                raise
+        return None
