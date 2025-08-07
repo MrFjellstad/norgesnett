@@ -26,8 +26,8 @@ class NorgesnettEntity(CoordinatorEntity):
         }
 
     @property
-    def device_state_attributes(self):
-        """Return the state attributes."""
+    def extra_state_attributes(self):
+        """Return the extra state attributes."""
         return {
             "attribution": ATTRIBUTION,
             "id": str(self.coordinator.data.get("id")),

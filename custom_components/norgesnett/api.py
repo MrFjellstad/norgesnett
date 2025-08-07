@@ -38,7 +38,7 @@ class NorgesnettApiClient:
             },
         )
         apiKey = auth_info["apiKey"]
-        _LOGGER.debug("apiKey:", apiKey)
+        _LOGGER.debug("apiKey: %s", apiKey)
         return auth_info
 
     async def async_get_data(self) -> dict:
@@ -78,7 +78,11 @@ class NorgesnettApiClient:
     #     await self.api_wrapper("patch", url, data={"title": value}, headers=HEADERS)
 
     async def api_wrapper(
-        self, method: str, url: str, data: dict = {}, headers: dict = {}
+        self,
+        method: str,
+        url: str,
+        data: dict | None = None,
+        headers: dict | None = None,
     ) -> dict:
         """Get information from the API."""
         _LOGGER.info("api_wrapper: %s %s", method, url)
