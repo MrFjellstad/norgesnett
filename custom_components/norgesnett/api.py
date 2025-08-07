@@ -38,7 +38,7 @@ class NorgesnettApiClient:
             },
         )
         apiKey = auth_info["apiKey"]
-        _LOGGER.debug("apiKey:", apiKey)
+        _LOGGER.debug("apiKey: %s", apiKey)
         return auth_info
 
     async def async_get_data(self) -> dict:
