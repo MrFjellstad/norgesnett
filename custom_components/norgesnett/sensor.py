@@ -148,7 +148,10 @@ class NorgesnettHourlyPricesSensor(NorgesnettEntity, SensorEntity):
 
 
 class NorgesnettCurrentPriceSensor(NorgesnettEntity, SensorEntity):
-    """Sensor som viser dagens pris for gjeldende time."""
+    """Sensor som viser dagens pris for gjeldende time.
+
+    Oppdateres hvert minutt ved second=0 for å fange timebytte.
+    """
 
     @property
     def device_class(self):
@@ -166,8 +169,8 @@ class NorgesnettCurrentPriceSensor(NorgesnettEntity, SensorEntity):
         self._unsub_time_listener = None
 
     async def async_added_to_hass(self):
-        """Når sensoren legges til, schedule oppdatering på hver hel time."""
-        # Kall _update_state klokken H:00:00 hvert minutt
+        """Når sensoren legges til, planlegg oppdatering hvert minutt."""
+        # _update_state trigges hvert minutt når second=0
         self._unsub_time_listener = async_track_time_change(
             self.hass, self._update_state, second=0
         )
@@ -179,7 +182,10 @@ class NorgesnettCurrentPriceSensor(NorgesnettEntity, SensorEntity):
             self._unsub_time_listener = None
 
     def _update_state(self, now_time):
-        """Tving HA til å oppdatere state, uten å hente ny data fra API."""
+        """Tving HA til å oppdatere state uten å hente ny data fra API.
+
+        Kalles hvert minutt fra :func:`async_added_to_hass` når second=0.
+        """
         # force_refresh=False: vi bruker fremdeles gammel coordinator.data
         self.hass.loop.call_soon_threadsafe(
             self.async_schedule_update_ha_state, False  # force_refresh=False
