@@ -3,10 +3,14 @@
     "step": {
       "user": {
         "title": "Norgesnett",
-        "description": "Hvis du trenger hjep til konfigurasjon ta en titt her: https://github.com/MrFjellstad/norgesnett",
+        "description": "Hvis du trenger hjep til konfigurasjon ta en titt på [dokumentasjonen]({documentation_url}).",
         "data": {
           "customer_id": "Kundenummer",
           "meteringpoint_id": "Målepunktid (EAN)"
+        },
+        "data_description": {
+          "customer_id": "Ditt Norgesnett kundenummer",
+          "meteringpoint_id": "Ditt målepunkt ID"
         }
       }
     },

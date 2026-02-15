@@ -3,10 +3,14 @@
     "step": {
       "user": {
         "title": "Norgesnett",
-        "description": "If you need help with the configuration have a look here: https://github.com/MrFjellstad/norgesnett",
+        "description": "If you need help with the configuration have a look at the [documentation]({documentation_url}).",
         "data": {
           "customer_id": "Username",
           "meteringpoint_id": "Password"
+        },
+        "data_description": {
+          "customer_id": "Your Norgesnett customer ID",
+          "meteringpoint_id": "Your metering point ID"
         }
       }
     },
