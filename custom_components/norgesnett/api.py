@@ -121,7 +121,11 @@ class NorgesnettApiClient:
                         response.raise_for_status()
                         return await response.json()
 
-            except (asyncio.TimeoutError, aiohttp.ClientError, socket.gaierror) as exception:
+            except (
+                asyncio.TimeoutError,
+                aiohttp.ClientError,
+                socket.gaierror,
+            ) as exception:
                 _LOGGER.error(
                     "Attempt %s/%s error fetching information from %s - %s",
                     attempt,
