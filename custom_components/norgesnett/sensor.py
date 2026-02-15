@@ -150,6 +150,7 @@ class NorgesnettHourlyPricesSensor(NorgesnettEntity, SensorEntity):
             _LOGGER.error(f"NorgesnettHourlyPricesSensor: Exception getting state: {e}")
             return None
 
+    @property
     def name(self):
         return f"{DEFAULT_NAME} Hourly Prices (JSON)"
 

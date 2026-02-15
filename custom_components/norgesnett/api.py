@@ -72,10 +72,10 @@ class NorgesnettApiClient:
         tariffs = await self.api_wrapper("post", url, data=request, headers=headers)
         return tariffs
 
-    # async def async_set_title(self, value: str) -> None:
-    #     """Get data from the API."""
-    #     url = "https://jsonplaceholder.typicode.com/posts/1"
-    #     await self.api_wrapper("patch", url, data={"title": value}, headers=HEADERS)
+    async def async_set_title(self, value: str) -> None:
+        """Get data from the API."""
+        url = "https://jsonplaceholder.typicode.com/posts/1"
+        await self.api_wrapper("patch", url, data={"title": value}, headers=HEADERS)
 
     async def api_wrapper(
         self,

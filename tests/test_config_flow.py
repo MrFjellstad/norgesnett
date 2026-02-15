@@ -1,9 +1,8 @@
 """Tests for config_flow of Norgesnett integration."""
 
 import pytest
-from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import RESULT_TYPE_CREATE_ENTRY, RESULT_TYPE_FORM
+from homeassistant.data_entry_flow import FlowResultType
 
 import custom_components.norgesnett.config_flow as config_flow
 from custom_components.norgesnett.const import (
@@ -29,7 +28,7 @@ class DummyFlow(config_flow.NorgesnettFlowHandler):
 
     def async_create_entry(self, title, data):
         self.created = True
-        return {"type": RESULT_TYPE_CREATE_ENTRY, "title": title, "data": data}
+        return {"type": FlowResultType.CREATE_ENTRY, "title": title, "data": data}
 
 
 @pytest.fixture
@@ -43,7 +42,7 @@ def flow_handler(hass: HomeAssistant):
 async def test_show_form_initial(flow_handler):
     """Test that initial form is shown."""
     result = await flow_handler.async_step_user()
-    assert result["type"] == RESULT_TYPE_FORM
+    assert result["type"] == FlowResultType.FORM
     # Form schema keys
     schema = result["data_schema"]
     assert CONF_CUSTOMER_ID in schema.schema
@@ -64,10 +63,10 @@ async def test_user_step_credentials(flow_handler, cust, meter, expect_errors):
         {CONF_CUSTOMER_ID: cust, CONF_METERINGPOINT_ID: meter}
     )
     if expect_errors:
-        assert result["type"] == RESULT_TYPE_FORM
+        assert result["type"] == FlowResultType.FORM
         assert flow_handler._errors.get("base") == "auth"
     else:
-        assert result["type"] == RESULT_TYPE_CREATE_ENTRY
+        assert result["type"] == FlowResultType.CREATE_ENTRY
         assert flow_handler.created
         assert result["title"] == meter
         assert result["data"] == {CONF_CUSTOMER_ID: cust, CONF_METERINGPOINT_ID: meter}
@@ -77,7 +76,7 @@ async def test_create_entry_exception(flow_handler, caplog):
     """Simulate exception in create_entry branch."""
 
     # Monkeypatch create_entry to raise
-    async def raise_exc(*args, **kwargs):
+    def raise_exc(*args, **kwargs):
         raise Exception("creation failed")
 
     flow_handler.async_create_entry = raise_exc
@@ -85,7 +84,7 @@ async def test_create_entry_exception(flow_handler, caplog):
     result = await flow_handler.async_step_user(
         {CONF_CUSTOMER_ID: "valid", CONF_METERINGPOINT_ID: "valid"}
     )
-    assert result["type"] == RESULT_TYPE_FORM
+    assert result["type"] == FlowResultType.FORM
     assert flow_handler._errors.get("base") == "unknown"
     assert "Feil i async_create_entry" in caplog.text
 
@@ -93,42 +92,44 @@ async def test_create_entry_exception(flow_handler, caplog):
 async def test_unexpected_exception(flow_handler, caplog, monkeypatch):
     """Simulate unexpected exception in step."""
 
-    # Monkeypatch _show_config_form to raise
-    async def bad_show(*args, **kwargs):
-        raise RuntimeError("bad form")
+    # Monkeypatch _test_credentials to raise
+    async def bad_test(*args, **kwargs):
+        raise RuntimeError("test error")
 
-    monkeypatch.setattr(flow_handler, "_show_config_form", bad_show)
+    monkeypatch.setattr(flow_handler, "_test_credentials", bad_test)
 
-    result = await flow_handler.async_step_user(None)
-    assert result["type"] == RESULT_TYPE_FORM
+    result = await flow_handler.async_step_user(
+        {CONF_CUSTOMER_ID: "test", CONF_METERINGPOINT_ID: "test"}
+    )
+    assert result["type"] == FlowResultType.FORM
     assert flow_handler._errors.get("base") == "unknown"
     assert "Uventet feil i config flow" in caplog.text
 
 
 async def test_options_flow(hass: HomeAssistant):
     """Test options flow returns form and create entry."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
     # Create dummy entry with empty options
-    entry = config_entries.ConfigEntry(
-        version=1,
+    entry = MockConfigEntry(
         domain=DOMAIN,
-        title="t",
         data={CONF_CUSTOMER_ID: "c", CONF_METERINGPOINT_ID: "m"},
         options={},
         entry_id="testid",
-        source="test",
-        connection_class=config_flow.config_entries.CONN_CLASS_CLOUD_POLL,
-        system_options={},
     )
+    entry.add_to_hass(hass)
     options_handler = config_flow.NorgesnettOptionsFlowHandler(entry)
+    options_handler.hass = hass
+    options_handler.handler = entry.entry_id
 
     # Initial step
     result = await options_handler.async_step_init()
-    assert result["type"] == RESULT_TYPE_FORM
+    assert result["type"] == FlowResultType.FORM
 
     # Submit options
     user_input = {p: False for p in config_flow.PLATFORMS}
     result2 = await options_handler.async_step_user(user_input)
     # Should create entry with updated options
-    assert result2["type"] == RESULT_TYPE_CREATE_ENTRY
+    assert result2["type"] == FlowResultType.CREATE_ENTRY
     assert result2["data"] == user_input
     assert result2["title"] == entry.data[CONF_CUSTOMER_ID]
