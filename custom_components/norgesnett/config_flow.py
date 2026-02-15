@@ -98,9 +98,14 @@ class NorgesnettOptionsFlowHandler(config_entries.OptionsFlow):
     """Config flow options handler for norgesnett."""
 
     def __init__(self, config_entry):
-        """Initialize HACS options flow."""
-        super().__init__()
+        """Initialize options flow."""
+        self._config_entry = config_entry
         self.options = {}
+
+    @property
+    def config_entry(self):
+        """Return config entry."""
+        return self._config_entry
 
     async def async_step_init(self, user_input=None):  # pylint: disable=unused-argument
         """Manage the options."""

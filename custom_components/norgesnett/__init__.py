@@ -43,7 +43,9 @@ except AttributeError:
     try:
         CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
     except AttributeError:
-        CONFIG_SCHEMA = vol.Schema({})
+        CONFIG_SCHEMA = vol.Schema(
+            {vol.Optional(DOMAIN): vol.Any()}, extra=vol.ALLOW_EXTRA
+        )
 
 
 async def async_setup(hass: HomeAssistant, config: Config):
