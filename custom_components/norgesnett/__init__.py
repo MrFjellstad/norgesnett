@@ -18,6 +18,7 @@ if importlib.util.find_spec("homeassistant.core_config"):
 else:
     from homeassistant.core import Config
 
+import voluptuous as vol
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -36,7 +37,15 @@ SCAN_INTERVAL = timedelta(days=1)
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+try:
+    CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+except AttributeError:
+    try:
+        CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
+    except AttributeError:
+        CONFIG_SCHEMA = vol.Schema(
+            {vol.Optional(DOMAIN): vol.Any()}, extra=vol.ALLOW_EXTRA
+        )
 
 
 async def async_setup(hass: HomeAssistant, config: Config):
