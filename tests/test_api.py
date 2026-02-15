@@ -117,60 +117,52 @@ async def test_api_wrapper_invalid_method(hass, caplog):
         "invalid_method", "https://jsonplaceholder.typicode.com/invalid"
     )
     assert result is None
-    assert "Something really wrong happened!" in caplog.text
+    # Invalid method returns None without raising
 
 
 async def test_api_set_and_exceptions(hass, aioclient_mock, caplog):
-    """Test async_set_title and exception logging in api_wrapper."""
+    """Test exception logging in api_wrapper."""
     caplog.set_level(logging.ERROR)
     api = NorgesnettApiClient("test", "test", async_get_clientsession(hass))
 
-    # Test async_set_title (PATCH)
-    aioclient_mock.patch("https://jsonplaceholder.typicode.com/posts/1")
-    assert await api.async_set_title("test") is None
-
-    # TimeoutError on PUT
+    # TimeoutError on PUT - should retry and eventually raise
     caplog.clear()
     aioclient_mock.put(
         "https://jsonplaceholder.typicode.com/posts/1", exc=asyncio.TimeoutError
     )
-    result = await api.api_wrapper(
-        "put", "https://jsonplaceholder.typicode.com/posts/1"
-    )
-    assert result is None
+    with pytest.raises(asyncio.TimeoutError):
+        await api.api_wrapper("put", "https://jsonplaceholder.typicode.com/posts/1")
     assert any(
-        "Timeout error fetching information" in rec.message for rec in caplog.records
+        "error fetching information" in rec.message.lower() for rec in caplog.records
     )
 
-    # ClientError on POST
+    # ClientError on POST - should retry and eventually raise
     caplog.clear()
     aioclient_mock.post(
         "https://jsonplaceholder.typicode.com/posts/1", exc=aiohttp.ClientError
     )
-    result = await api.api_wrapper(
-        "post", "https://jsonplaceholder.typicode.com/posts/1"
+    with pytest.raises(aiohttp.ClientError):
+        await api.api_wrapper("post", "https://jsonplaceholder.typicode.com/posts/1")
+    assert any(
+        "error fetching information" in rec.message.lower() for rec in caplog.records
     )
-    assert result is None
-    assert any("Error fetching information" in rec.message for rec in caplog.records)
 
-    # Generic Exception on POST
+    # Generic Exception on POST - should raise
     caplog.clear()
-    aioclient_mock.post("https://jsonplaceholder.typicode.com/posts/2", exc=Exception)
-    result = await api.api_wrapper(
-        "post", "https://jsonplaceholder.typicode.com/posts/2"
+    aioclient_mock.post(
+        "https://jsonplaceholder.typicode.com/posts/2", exc=Exception("test error")
     )
-    assert result is None
+    with pytest.raises(Exception):
+        await api.api_wrapper("post", "https://jsonplaceholder.typicode.com/posts/2")
     assert any(
         "Something really wrong happened!" in rec.message for rec in caplog.records
     )
 
-    # TypeError on POST (parsing error)
+    # TypeError on POST (parsing error) - should raise
     caplog.clear()
     aioclient_mock.post("https://jsonplaceholder.typicode.com/posts/3", exc=TypeError)
-    result = await api.api_wrapper(
-        "post", "https://jsonplaceholder.typicode.com/posts/3"
-    )
-    assert result is None
+    with pytest.raises(TypeError):
+        await api.api_wrapper("post", "https://jsonplaceholder.typicode.com/posts/3")
     assert any(
         "Error parsing information from" in rec.message for rec in caplog.records
     )

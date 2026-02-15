@@ -1,6 +1,5 @@
 """Sensor platform for Norgesnett."""
 
-import json
 import logging
 
 from homeassistant.components.sensor import SensorEntity
@@ -79,8 +78,15 @@ class NorgesnettSensor(NorgesnettEntity):
 
     @property
     def state(self):
-        # Returner siste verdi fra koordinator, evt. fallback til init
-        return self.coordinator.data.get(self._key, self._attr_native_value)
+        # Return latest value from coordinator, fallback to init value
+        try:
+            value = self.coordinator.data.get(self._key, self._attr_native_value)
+            return value
+        except Exception as e:
+            _LOGGER.error(
+                f"NorgesnettSensor: Exception getting state for {self._key}: {e}"
+            )
+            return self._attr_native_value
 
     @property
     def name(self):
@@ -94,8 +100,8 @@ class NorgesnettSensor(NorgesnettEntity):
 
     @property
     def device_class(self):
-        """Return de device class of the sensor."""
-        return "norgesnett__custom_device_class"
+        """Return the device class of the sensor."""
+        return "monetary"
 
 
 class NorgesnettHourlyPricesSensor(NorgesnettEntity, SensorEntity):
@@ -122,27 +128,29 @@ class NorgesnettHourlyPricesSensor(NorgesnettEntity, SensorEntity):
 
     @property
     def state(self):
-        # Du kan for eksempel returnere antall perioder:
-        collections = self.coordinator.data.get("gridTariffCollections") or []
-
-        if not collections:
+        # Return number of periods (hours) as state, use attributes for details
+        try:
+            collections = self.coordinator.data.get("gridTariffCollections") or []
+            if (
+                not collections
+                or not isinstance(collections, list)
+                or len(collections) == 0
+            ):
+                return None
+            hours = (
+                collections[0]
+                .get("gridTariff", {})
+                .get("tariffPrice", {})
+                .get("hours", [])
+            )
+            if not hours or not isinstance(hours, list):
+                return None
+            return len(hours)
+        except Exception as e:
+            _LOGGER.error(f"NorgesnettHourlyPricesSensor: Exception getting state: {e}")
             return None
 
-        hours = (
-            collections[0].get("gridTariff", {}).get("tariffPrice", {}).get("hours", [])
-        )
-        # Bygg opp dict som før
-        result = {
-            entry.get("shortName"): {
-                "total": entry.get("energyPrice", {}).get("total"),
-                "totalExVat": entry.get("energyPrice", {}).get("totalExVat"),
-            }
-            for entry in hours
-            if entry.get("shortName") and entry.get("energyPrice")
-        }
-        # Returner som kompakt JSON
-        return json.dumps(result)
-
+    @property
     def name(self):
         return f"{DEFAULT_NAME} Hourly Prices (JSON)"
 
@@ -193,30 +201,34 @@ class NorgesnettCurrentPriceSensor(NorgesnettEntity, SensorEntity):
 
     @property
     def state(self):
-        """Returner total-prisen for gjeldende timeintervall."""
-        # Hent listen med timer fra koordinatoren
-        collections = self.coordinator.data.get("gridTariffCollections") or []
-        if not collections:
+        """Return total price for current hour interval."""
+        try:
+            collections = self.coordinator.data.get("gridTariffCollections") or []
+            if (
+                not collections
+                or not isinstance(collections, list)
+                or len(collections) == 0
+            ):
+                return None
+            hours = (
+                collections[0]
+                .get("gridTariff", {})
+                .get("tariffPrice", {})
+                .get("hours", [])
+            )
+            if not hours or not isinstance(hours, list):
+                _LOGGER.debug("CurrentPrice: ingen timer i data")
+                return None
+            current = now()
+            current_hour = current.hour
+            next_hour = (current_hour + 1) % 24
+            short_name = f"{current_hour:02d}-{next_hour:02d}"
+            for hour in hours:
+                if hour.get("shortName") == short_name:
+                    energy = hour.get("energyPrice") or {}
+                    return energy.get("total")
+            _LOGGER.debug(f"CurrentPrice: ingen match for shortName {short_name}")
             return None
-
-        hours = (
-            collections[0].get("gridTariff", {}).get("tariffPrice", {}).get("hours", [])
-        )
-        if not hours:
-            _LOGGER.debug("CurrentPrice: ingen timer i data")
+        except Exception as e:
+            _LOGGER.error(f"NorgesnettCurrentPriceSensor: Exception getting state: {e}")
             return None
-
-        # Finn nåværende lokal tid (kan byttes til UTC om API gir UTC-tider)
-        current = now()
-        current_hour = current.hour
-        next_hour = (current_hour + 1) % 24
-        short_name = f"{current_hour:02d}-{next_hour:02d}"
-
-        # Let opp elementet med matching shortName
-        for hour in hours:
-            if hour.get("shortName") == short_name:
-                energy = hour.get("energyPrice") or {}
-                return energy.get("total")
-
-        # Returner None dersom ikke funnet
-        return None

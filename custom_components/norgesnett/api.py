@@ -4,6 +4,7 @@ import asyncio
 import logging
 import socket
 from datetime import datetime
+from typing import Optional
 
 import aiohttp
 import async_timeout
@@ -72,17 +73,17 @@ class NorgesnettApiClient:
         tariffs = await self.api_wrapper("post", url, data=request, headers=headers)
         return tariffs
 
-    # async def async_set_title(self, value: str) -> None:
-    #     """Get data from the API."""
-    #     url = "https://jsonplaceholder.typicode.com/posts/1"
-    #     await self.api_wrapper("patch", url, data={"title": value}, headers=HEADERS)
+    async def async_set_title(self, value: str) -> None:
+        """Get data from the API."""
+        url = "https://jsonplaceholder.typicode.com/posts/1"
+        await self.api_wrapper("patch", url, data={"title": value}, headers=HEADERS)
 
     async def api_wrapper(
         self,
         method: str,
         url: str,
-        data: dict | None = None,
-        headers: dict | None = None,
+        data: Optional[dict] = None,
+        headers: Optional[dict] = None,
         max_attempts: int = 3,
         base_delay: float = 1.0,
     ) -> dict:
@@ -121,7 +122,11 @@ class NorgesnettApiClient:
                         response.raise_for_status()
                         return await response.json()
 
-            except (asyncio.TimeoutError, aiohttp.ClientError, socket.gaierror) as exception:
+            except (
+                asyncio.TimeoutError,
+                aiohttp.ClientError,
+                socket.gaierror,
+            ) as exception:
                 _LOGGER.error(
                     "Attempt %s/%s error fetching information from %s - %s",
                     attempt,
