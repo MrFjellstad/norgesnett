@@ -4,6 +4,7 @@ import asyncio
 import logging
 import socket
 from datetime import datetime
+from typing import Optional
 
 import aiohttp
 import async_timeout
@@ -81,8 +82,8 @@ class NorgesnettApiClient:
         self,
         method: str,
         url: str,
-        data: dict | None = None,
-        headers: dict | None = None,
+        data: Optional[dict] = None,
+        headers: Optional[dict] = None,
         max_attempts: int = 3,
         base_delay: float = 1.0,
     ) -> dict:
