@@ -37,15 +37,15 @@ SCAN_INTERVAL = timedelta(days=1)
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
-try:
-    CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-except AttributeError:
-    try:
-        CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
-    except AttributeError:
-        CONFIG_SCHEMA = vol.Schema(
-            {vol.Optional(DOMAIN): vol.Any()}, extra=vol.ALLOW_EXTRA
-        )
+CONFIG_SCHEMA = (
+    cv.config_entry_only_config_schema(DOMAIN)
+    if hasattr(cv, "config_entry_only_config_schema")
+    else (
+        cv.empty_config_schema(DOMAIN)
+        if hasattr(cv, "empty_config_schema")
+        else vol.Schema({vol.Optional(DOMAIN): vol.Any()}, extra=vol.ALLOW_EXTRA)
+    )
+)
 
 
 async def async_setup(hass: HomeAssistant, config: Config):
