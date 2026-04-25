@@ -166,3 +166,14 @@ async def test_api_set_and_exceptions(hass, aioclient_mock, caplog):
     assert any(
         "Error parsing information from" in rec.message for rec in caplog.records
     )
+
+
+async def test_async_set_title_calls_patch(hass, aioclient_mock):
+    """Test async_set_title sends PATCH request with expected payload."""
+    api = NorgesnettApiClient("test", "test", async_get_clientsession(hass))
+
+    aioclient_mock.patch(
+        "https://jsonplaceholder.typicode.com/posts/1", json={"title": "updated"}
+    )
+
+    await api.async_set_title("updated")
