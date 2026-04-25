@@ -1,8 +1,11 @@
 """Tests for config_flow of Norgesnett integration."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 import custom_components.norgesnett.config_flow as config_flow
 from custom_components.norgesnett.const import (
@@ -133,3 +136,34 @@ async def test_options_flow(hass: HomeAssistant):
     assert result2["type"] == FlowResultType.CREATE_ENTRY
     assert result2["data"] == user_input
     assert result2["title"] == entry.data[CONF_CUSTOMER_ID]
+
+
+def test_async_get_options_flow_returns_handler():
+    """Test options-flow factory returns the expected handler class."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_CUSTOMER_ID: "cust", CONF_METERINGPOINT_ID: "meter"},
+        options={},
+        entry_id="factory",
+    )
+    handler = config_flow.NorgesnettFlowHandler.async_get_options_flow(entry)
+    assert isinstance(handler, config_flow.NorgesnettOptionsFlowHandler)
+
+
+@pytest.mark.asyncio
+async def test_test_credentials_success_and_failure(hass: HomeAssistant):
+    """Test credential probing helper success and failure paths."""
+    flow = config_flow.NorgesnettFlowHandler()
+    flow.hass = hass
+
+    with patch(
+        "custom_components.norgesnett.config_flow.NorgesnettApiClient.async_get_auth",
+        new=AsyncMock(return_value={"apiKey": "ok"}),
+    ):
+        assert await flow._test_credentials("cust", "meter") is True
+
+    with patch(
+        "custom_components.norgesnett.config_flow.NorgesnettApiClient.async_get_auth",
+        new=AsyncMock(side_effect=Exception("bad auth")),
+    ):
+        assert await flow._test_credentials("cust", "meter") is False
