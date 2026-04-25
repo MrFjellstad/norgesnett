@@ -95,6 +95,23 @@ def test_module_reload_config_import_fallback_branch():
             assert reloaded is not None
 
 
+def test_module_reload_config_import_primary_branch():
+    """Test module primary branch importing Config from homeassistant.core_config."""
+    fake_core_config = types.ModuleType("homeassistant.core_config")
+    fake_core_config.Config = object
+
+    with patch("importlib.util.find_spec", return_value=object()):
+        with patch.dict(
+            sys.modules,
+            {"homeassistant.core_config": fake_core_config},
+            clear=False,
+        ):
+            reloaded = importlib.reload(norgesnett_module)
+            assert reloaded is not None
+
+    importlib.reload(norgesnett_module)
+
+
 def test_module_reload_config_schema_fallback_branch():
     """Test module fallback branch building CONFIG_SCHEMA with vol.Schema."""
     import homeassistant.helpers as ha_helpers
