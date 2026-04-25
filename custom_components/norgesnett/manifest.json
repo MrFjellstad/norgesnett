@@ -6,7 +6,7 @@
   "documentation": "https://github.com/MrFjellstad/norgesnett",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "requirements": ["async-timeout>=4.0.3"],
   "issue_tracker": "https://github.com/MrFjellstad/norgesnett/issues",
+  "requirements": ["async-timeout>=4.0.3"],
   "version": "0.1.0"
 }
